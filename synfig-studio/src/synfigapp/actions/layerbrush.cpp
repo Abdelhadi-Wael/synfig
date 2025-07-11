@@ -1,9 +1,9 @@
 /* === S Y N F I G ========================================================= */
-/*!	\file layerbrush.cpp
-**	\brief Brush stroke action for StateBrush2 with live preview
+/*!	\file layerpaint.cpp
+**	\brief Template File
 **
 **	\legal
-**	......... ... 2024
+**	......... ... 2014 Ivan Mahonin
 **
 **	This file is part of Synfig.
 **
