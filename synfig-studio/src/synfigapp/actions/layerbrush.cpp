@@ -134,6 +134,20 @@ void
 Action::LayerBrush::BrushStroke::prepare()
 {
 	if (!layer || prepared) return;
+	
+	// Initialize surface from the layer's rendering surface
+	// Based on LayerPaint::PaintStroke::prepare() implementation
+	if (layer->rendering_surface) {
+		rendering::SurfaceResource::LockRead<rendering::SurfaceSW> lock(layer->rendering_surface);
+		if (lock) {
+			original_surface = lock->get_surface();
+		}
+	}
+	
+	// Set up layer bounds (tl/br parameters)
+	original_tl = layer->get_param("tl").get(Point());
+	original_br = layer->get_param("br").get(Point());
+	
 	prepared = true;
 }
 
@@ -158,11 +172,31 @@ Action::LayerBrush::BrushStroke::apply()
 void
 Action::LayerBrush::BrushStroke::undo()
 {
+	if (!prepared || !applied || !layer) {
+		return;
+	}
+	
+	if (!original_surface.is_valid()) {
+		return;
+	}
+	
+	{
+		std::lock_guard<std::mutex> lock(layer->mutex);
+		layer->rendering_surface = new rendering::SurfaceResource(
+			new rendering::SurfaceSW(original_surface, true));
+	}
+	
+	layer->set_param("tl", ValueBase(original_tl));
+	layer->set_param("br", ValueBase(original_br));
+	layer->changed();
+	
+	applied = false;
 }
 
 Action::LayerBrush::LayerBrush():
 	applied(false)
 {
+	set_dirty(true);
 }
 
 Action::ParamVocab
@@ -237,4 +271,11 @@ Action::LayerBrush::perform()
 void
 Action::LayerBrush::undo()
 {
+	if (applied) {
+		stroke.undo();
+		applied = false;
+		if (get_canvas_interface()) {
+			get_canvas_interface()->signal_layer_param_changed()(stroke.get_layer(), "rendering_surface");
+		}
+	}
 }
